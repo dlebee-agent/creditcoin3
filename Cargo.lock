@@ -142,7 +142,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28e2652684758b0d9b389d248b209ed9fd9989ef489a550265fe4bb8454fe7eb"
 dependencies = [
  "alloy-primitives",
- "num_enum 0.7.3",
+ "num_enum",
  "strum 0.27.1",
 ]
 
@@ -944,7 +944,7 @@ dependencies = [
 
 [[package]]
 name = "archiver"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -1537,11 +1537,10 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
 name = "attestor"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
  "alloy",
  "anyhow",
- "arc-swap",
  "attestor-primitives",
  "attestor_pool",
  "axum",
@@ -1580,7 +1579,7 @@ dependencies = [
 
 [[package]]
 name = "attestor-primitives"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
  "bls-signatures",
  "parity-scale-codec",
@@ -1599,7 +1598,7 @@ dependencies = [
 
 [[package]]
 name = "attestor_pool"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
  "attestor-primitives",
  "bls-signatures",
@@ -1615,10 +1614,9 @@ dependencies = [
 
 [[package]]
 name = "attestor_zombienet"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
  "anyhow",
- "arc-swap",
  "attestor-primitives",
  "bip39",
  "cc-client",
@@ -2105,7 +2103,7 @@ dependencies = [
 
 [[package]]
 name = "builder"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2237,11 +2235,12 @@ dependencies = [
 
 [[package]]
 name = "cc-client"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
  "anyhow",
  "arc-swap",
  "attestor-primitives",
+ "serde",
  "sp-core",
  "subxt",
  "subxt-signer",
@@ -2251,6 +2250,7 @@ dependencies = [
  "tokio-retry",
  "tracing",
  "usc-abi-encoding",
+ "user",
  "vrf",
 ]
 
@@ -2332,7 +2332,7 @@ dependencies = [
 
 [[package]]
 name = "checkpoint-builder"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
  "anyhow",
  "attestor-primitives",
@@ -2505,7 +2505,7 @@ dependencies = [
 
 [[package]]
 name = "common"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
  "attestor-primitives",
  "rstest 0.26.1",
@@ -2825,14 +2825,14 @@ dependencies = [
 
 [[package]]
 name = "creditcoin3-cli-opt"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
  "clap",
 ]
 
 [[package]]
 name = "creditcoin3-node"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
  "async-trait",
  "attestor-primitives",
@@ -2916,7 +2916,7 @@ dependencies = [
 
 [[package]]
 name = "creditcoin3-runtime"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
  "attestor-primitives",
  "ethereum 0.18.2",
@@ -2936,7 +2936,6 @@ dependencies = [
  "log",
  "moonbeam-evm-tracer",
  "moonbeam-rpc-primitives-debug",
- "num_enum 0.5.11",
  "pallet-attestation",
  "pallet-authorship",
  "pallet-babe",
@@ -2977,7 +2976,6 @@ dependencies = [
  "pallet-transaction-payment-rpc-runtime-api",
  "pallet-utility",
  "parity-scale-codec",
- "precompile-utils",
  "randomness-primitives",
  "scale-info",
  "smallvec",
@@ -3864,7 +3862,7 @@ dependencies = [
 
 [[package]]
 name = "eth"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
  "alloy",
  "anyhow",
@@ -4608,7 +4606,7 @@ dependencies = [
  "environmental",
  "evm",
  "frame-support",
- "num_enum 0.7.3",
+ "num_enum",
  "parity-scale-codec",
  "scale-info",
  "serde",
@@ -5179,7 +5177,7 @@ dependencies = [
 
 [[package]]
 name = "generate-bags"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
  "clap",
  "creditcoin3-runtime",
@@ -6217,7 +6215,7 @@ dependencies = [
 
 [[package]]
 name = "indexer-client"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
  "anyhow",
  "attestor-primitives",
@@ -7992,7 +7990,7 @@ dependencies = [
 
 [[package]]
 name = "merkle"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
  "parity-scale-codec",
  "precompile-utils",
@@ -8031,7 +8029,7 @@ dependencies = [
 
 [[package]]
 name = "metrics"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
  "attestor-primitives",
  "builder",
@@ -8804,32 +8802,11 @@ dependencies = [
 
 [[package]]
 name = "num_enum"
-version = "0.5.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f646caf906c20226733ed5b1374287eb97e3c2a5c227ce668c1f2ce20ae57c9"
-dependencies = [
- "num_enum_derive 0.5.11",
-]
-
-[[package]]
-name = "num_enum"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e613fc340b2220f734a8595782c551f1250e969d87d3be1ae0579e8d4065179"
 dependencies = [
- "num_enum_derive 0.7.3",
-]
-
-[[package]]
-name = "num_enum_derive"
-version = "0.5.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcbff9bc912032c62bf65ef1d5aea88983b420f4f839db1e9b0c281a25c9c799"
-dependencies = [
- "proc-macro-crate 1.1.3",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
+ "num_enum_derive",
 ]
 
 [[package]]
@@ -9031,7 +9008,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-attestation"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
  "attestor-primitives",
  "bls-signatures",
@@ -9593,13 +9570,12 @@ dependencies = [
 
 [[package]]
 name = "pallet-randomness"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
  "frame-benchmarking",
  "frame-election-provider-support",
  "frame-support",
  "frame-system",
- "log",
  "pallet-authorship",
  "pallet-babe",
  "pallet-balances",
@@ -9616,7 +9592,6 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-staking",
- "sp-std",
 ]
 
 [[package]]
@@ -9690,7 +9665,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-supported-chains"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
  "attestor-primitives",
  "frame-benchmarking",
@@ -10284,7 +10259,7 @@ dependencies = [
  "hex-literal",
  "impl-trait-for-tuples",
  "log",
- "num_enum 0.7.3",
+ "num_enum",
  "pallet-evm",
  "parity-scale-codec",
  "precompile-utils-macro",
@@ -10304,7 +10279,7 @@ version = "0.1.0"
 source = "git+https://github.com/gluwa/frontier_2?branch=stable2409_patch#49bcd9779d851b0c6dab5afef59c48d5dfaf8e68"
 dependencies = [
  "case",
- "num_enum 0.7.3",
+ "num_enum",
  "prettyplease 0.2.32",
  "proc-macro2",
  "quote",
@@ -10570,7 +10545,7 @@ dependencies = [
 
 [[package]]
 name = "proof-gen-api-server"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
  "alloy",
  "alloy-node-bindings",
@@ -10594,7 +10569,6 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "sp-core",
- "stream",
  "sysinfo",
  "thiserror 1.0.69",
  "tokio",
@@ -10770,13 +10744,11 @@ dependencies = [
  "clap",
  "continuity",
  "eth",
- "futures 0.3.31",
  "hex",
  "merkle",
  "reqwest",
  "serde",
  "sp-core",
- "stream",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -11098,7 +11070,7 @@ dependencies = [
 
 [[package]]
 name = "randomness-primitives"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
  "impl-trait-for-tuples",
  "sp-api",
@@ -14909,7 +14881,7 @@ dependencies = [
 
 [[package]]
 name = "stream"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
  "stream_attestation",
  "stream_cc3",
@@ -14919,7 +14891,7 @@ dependencies = [
 
 [[package]]
 name = "stream_attestation"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
  "attestor-primitives",
  "bip39",
@@ -14944,9 +14916,9 @@ dependencies = [
 
 [[package]]
 name = "stream_cc3"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
- "arc-swap",
+ "anyhow",
  "async-stream",
  "attestor-primitives",
  "builder",
@@ -14954,12 +14926,13 @@ dependencies = [
  "futures 0.3.31",
  "subxt",
  "tokio",
+ "tokio-retry",
  "tracing",
 ]
 
 [[package]]
 name = "stream_eth"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
  "async-stream",
  "attestor-primitives",
@@ -14980,7 +14953,7 @@ dependencies = [
 
 [[package]]
 name = "stream_util"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
  "attestor-primitives",
  "futures 0.3.31",
@@ -15344,7 +15317,7 @@ dependencies = [
 
 [[package]]
 name = "supported-chains-primitives"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
  "attestor-primitives",
  "impl-trait-for-tuples",
@@ -16374,7 +16347,7 @@ dependencies = [
 
 [[package]]
 name = "user"
-version = "3.126.0"
+version = "3.122.0"
 
 [[package]]
 name = "utf-8"
@@ -16402,7 +16375,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "utils"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
  "anyhow",
  "fs2",
@@ -16497,7 +16470,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "vrf"
-version = "3.126.0"
+version = "3.122.0"
 dependencies = [
  "anyhow",
  "attestor-primitives",
