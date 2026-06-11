@@ -692,10 +692,10 @@
   resolved "https://registry.npmjs.org/@eslint/js/-/js-8.57.0.tgz"
   integrity sha512-Ys+3g2TaW7gADOJzPt83SJtCDhMjndcDMFVQ/Tj9iA1BfJzFKD9mAUXT3OenpuPHbI6P/myECxRJrofUsDx/5g==
 
-"@gluwa/usc-sdk@0.13.0":
-  version "0.13.0"
-  resolved "https://registry.yarnpkg.com/@gluwa/usc-sdk/-/usc-sdk-0.13.0.tgz#c1685c46560c822f627076dca3ba5f6d26e39e96"
-  integrity sha512-Y5/RtYD+a5SZFZ2wdOOg7famcSDP2wVnl/K0spW2q0IJH8KrllZ+l65+mFtRxAuB2MGVz7CV6KS1CM+HRnEZkw==
+"@gluwa/usc-sdk@0.16.0":
+  version "0.16.0"
+  resolved "https://registry.yarnpkg.com/@gluwa/usc-sdk/-/usc-sdk-0.16.0.tgz#0806c30ac263f97a8c0f27f06cc21a615904c9cf"
+  integrity sha512-Mrhho8mRG+e3T3mWE+273WqN2SBDGkqrnQNe6FcwaMSVUeFcTDpMLEH4iZtzatag4wXzoUMdKvn4lWne+K36bA==
   dependencies:
     axios "^1.13.2"
     dotenv "^17.2.3"
