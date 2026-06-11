@@ -16,6 +16,9 @@ jobs:
         include:
           # CC3 Devnet, Sepolia Full Archive
           - creditcoinUrl: "wss://rpc.cc3-devnet.creditcoin.network/ws"
+            # NOTE: matrix can't reference secrets directly; resolved via secrets[matrix.signerPk] at step time
+            # 0x2C317383b8A99537c61042B63C4fB042Df51033a
+            signerPk: "CC_TESTER_01_EVM_PK"
             proverUrl: "https://prover.cc3-devnet.creditcoin.network"
             indexerUrl: "https://graphql-usc.cc3-devnet.creditcoin.network"
             evmV1Decoder: "0xf882f3a71A36E29E86615B7055f42A68D7E4cfBB"
@@ -23,6 +26,8 @@ jobs:
 
           # CC3 Devnet, Ethereum Mainnet Full Archive
           - creditcoinUrl: "wss://rpc.cc3-devnet.creditcoin.network/ws"
+            # 0x1B2403DCe5A4c7D24469D33bCCa44d52b46888e8
+            signerPk: "CC_TESTER_02_EVM_PK"
             proverUrl: "https://prover.cc3-devnet.creditcoin.network"
             indexerUrl: "https://graphql-usc.cc3-devnet.creditcoin.network"
             evmV1Decoder: "0xf882f3a71A36E29E86615B7055f42A68D7E4cfBB"
@@ -30,6 +35,8 @@ jobs:
 
           # CC3 Testnet, Sepolia Full Archive
           - creditcoinUrl: "wss://rpc.cc3-testnet.creditcoin.network/ws"
+            # 0x2C317383b8A99537c61042B63C4fB042Df51033a
+            signerPk: "CC_TESTER_01_EVM_PK"
             proverUrl: "https://prover.cc3-testnet.creditcoin.network"
             indexerUrl: "https://graphql-usc.cc3-testnet.creditcoin.network"
             evmV1Decoder: "0x731c345d79Fb8BbDC541f9DF3b6317585F849F9f"
@@ -37,6 +44,8 @@ jobs:
 
           # CC3 Testnet, Ethereum Mainnet Full Archive
           - creditcoinUrl: "wss://rpc.cc3-testnet.creditcoin.network/ws"
+            # 0x1B2403DCe5A4c7D24469D33bCCa44d52b46888e8
+            signerPk: "CC_TESTER_02_EVM_PK"
             proverUrl: "https://prover.cc3-testnet.creditcoin.network"
             indexerUrl: "https://graphql-usc.cc3-testnet.creditcoin.network"
             evmV1Decoder: "0x731c345d79Fb8BbDC541f9DF3b6317585F849F9f"
@@ -83,7 +92,7 @@ jobs:
           GO_BACK_BLOCKS: '3600'
         run: |
           node dist/scripts/prover-check.js \
-            ${{ matrix.creditcoinUrl }} ${{ matrix.chainKey }} ${{ matrix.proverUrl }} \
+            ${{ matrix.creditcoinUrl }} ${{ secrets[matrix.signerPk] }} ${{ matrix.chainKey }} ${{ matrix.proverUrl }} \
             /var/tmp/${{ steps.test-env.outputs.chain-name }}-ck-${{ matrix.chainKey }} ${{ matrix.indexerUrl }} ${{ matrix.evmV1Decoder }}
 
       - name: Execute prover-check.ts on random blocks
@@ -94,7 +103,7 @@ jobs:
           STEP_THROUGH_BLOCKS: '7'
         run: |
           node dist/scripts/prover-check.js \
-            ${{ matrix.creditcoinUrl }} ${{ matrix.chainKey }} ${{ matrix.proverUrl }} \
+            ${{ matrix.creditcoinUrl }} ${{ secrets[matrix.signerPk] }} ${{ matrix.chainKey }} ${{ matrix.proverUrl }} \
             /var/tmp/${{ steps.test-env.outputs.chain-name }}-ck-${{ matrix.chainKey }} "" ${{ matrix.evmV1Decoder }}
 
       - name: Upload proofs
@@ -110,7 +119,8 @@ jobs:
         with:
           webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
           status: ${{ job.status }}
-          inputs: ${{ toJson(matrix) }}
+          # NOTE: do not include matrix.signerPk in inputs to avoid leaking the secret to Slack
+          inputs: '{"chainKey":"${{ matrix.chainKey }}","creditcoinUrl":"${{ matrix.creditcoinUrl }}"}'
           channel: "#noti-creditcoin-snapshots"
           message: "Checking CK(${{ matrix.chainKey }})@${{ matrix.proverUrl}} complete! cc <@U028EMRHS3S>"
 

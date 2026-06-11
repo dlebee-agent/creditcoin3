@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from 'fs';
 import { blockProver, chainInfo, proofProvider, utils } from '@gluwa/usc-sdk';
 import EvmV1DecoderABI from '@gluwa/usc-sdk/dist/utils/evmV1DecoderAbi.json';
 import ChainInfoABI from '@gluwa/usc-sdk/dist/chain-info/chain_info.json';
-import { Contract, WebSocketProvider } from 'ethers';
+import { Contract, Wallet, WebSocketProvider } from 'ethers';
 import { createClient } from 'graphqurl';
 import axios from 'axios';
 
@@ -74,6 +74,7 @@ const fetchCheckpoints = (
 
 async function main(
     creditcoinWsUrl: string,
+    signerPk: string,
     chainKey: number,
     proverBaseUrl: string,
     saveProofsTo: string,
@@ -148,6 +149,10 @@ async function main(
         contract = new Contract(decoderAddress, EvmV1DecoderABI, creditcoinWs);
     }
 
+    // verifyAndEmitSingle requires a signer
+    const signer = new Wallet(signerPk, creditcoinWs);
+    console.log(`**** INFO: verifyAndEmitSingle signer=${signer.address}`);
+
     for (const blockNumber of blocksToInspect) {
         console.log(`... get proof for source chain block ${blockNumber}`);
         await sleep(500); // rate-limit
@@ -162,17 +167,25 @@ async function main(
         console.log(`    ..... trying to verify proof for ${blockNumber} -> ${proofData.txHash}`);
         writeToDisk(saveProofsTo, proofData);
 
-        const verificationResult = await prover.verifySingle(
-            proofData.chainKey,
-            proofData.headerNumber,
-            proofData.txBytes,
-            proofData.merkleProof,
-            proofData.continuityProof,
-        );
-        console.log('    ... proof verification:', verificationResult ? 'SUCCESS' : 'FAILED');
-        if (!verificationResult) {
+        let receipt;
+        try {
+            const tx = await prover.verifyAndEmitSingle(
+                signer,
+                proofData.chainKey,
+                proofData.headerNumber,
+                proofData.txBytes,
+                proofData.merkleProof,
+                proofData.continuityProof,
+            );
+            receipt = await tx.wait();
+            console.log('    ... proof verification: SUCCESS');
+        } catch (err) {
+            console.log('    ... proof verification: FAILED', err);
             throw new Error('...... proof verification failed');
         }
+
+        const gasForVerification = receipt?.gasUsed ?? 0n;
+        console.log(`    ... gasForVerification=${gasForVerification}`);
 
         if (contract !== undefined) {
             console.log('    ..... trying to decode proof');
@@ -184,26 +197,33 @@ async function main(
     process.exit(0);
 }
 
-if (process.argv.length < 6) {
+if (process.argv.length < 7) {
     console.error(
-        'prover-check.js <creditcoinWssUrl> <chainKey> <proverBaseUrl> <saveProofsDir> [<indexerUrl>] [evmV1Decoder address]',
+        'prover-check.js <creditcoinWssUrl> <signerPk> <chainKey> <proverBaseUrl> <saveProofsDir> [<indexerUrl>] [evmV1Decoder address]',
     );
     process.exit(1);
 }
 
 const creditcoinWsRpcUrl = process.argv[2];
-const sourceChainKey = Number(process.argv[3]);
-const proverUrl = process.argv[4];
-const saveProofsDir = process.argv[5];
+const signerPrivateKey = process.argv[3];
+const sourceChainKey = Number(process.argv[4]);
+const proverUrl = process.argv[5];
+const saveProofsDir = process.argv[6];
 // when defined will query proofs at checkpoint boundaries
 // otherwise will query random blocks by iterating over them
-const cc3IndexerUrl = process.argv[6];
+const cc3IndexerUrl = process.argv[7];
 // when defined will decode proof data against on-chain contract
-const evmV1DecoderAddress = process.argv[7];
+const evmV1DecoderAddress = process.argv[8];
 
-main(creditcoinWsRpcUrl, sourceChainKey, proverUrl, saveProofsDir, cc3IndexerUrl, evmV1DecoderAddress).catch(
-    (reason) => {
-        console.error(reason);
-        process.exit(1);
-    },
-);
+main(
+    creditcoinWsRpcUrl,
+    signerPrivateKey,
+    sourceChainKey,
+    proverUrl,
+    saveProofsDir,
+    cc3IndexerUrl,
+    evmV1DecoderAddress,
+).catch((reason) => {
+    console.error(reason);
+    process.exit(1);
+});
