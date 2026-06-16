@@ -38,6 +38,7 @@ members = [
     "attestor/metrics",
     "attestor/common",
     "checkpoint-builder",
+    "block-merkle-verifier",
 ]
 resolver = "2"
 

@@ -2008,6 +2008,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "block-merkle-verifier"
+version = "0.1.0"
+dependencies = [
+ "alloy",
+ "anyhow",
+ "attestor-primitives",
+ "clap",
+ "eth",
+ "hex",
+ "sp-runtime-interface",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "usc-abi-encoding",
+ "user",
+ "utils",
+]
+
+[[package]]
 name = "blocking"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

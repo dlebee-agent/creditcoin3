@@ -1,0 +1,43 @@
+[package]
+name = "block-merkle-verifier"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Given a block height, expected merkle root, and RPC URL: fetch the block & receipts, encode transactions, compute the Keccak256 merkle root, and compare."
+
+[dependencies]
+# CLI
+clap = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true, features = ["full"] }
+
+# Error handling
+anyhow = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Alloy (already a workspace dep used by `eth`)
+alloy = { workspace = true }
+
+# Hex
+hex = { workspace = true }
+
+# In-repo crates — we only use `eth` (which already manages all Substrate
+# feature flags internally) and the no-dep `user` crate for the Interrupt type.
+eth = { workspace = true }
+user = { workspace = true }
+utils = { path = "../common/utils" }
+
+# sp-runtime-interface is pulled in transitively by eth→attestor-primitives
+# (compiled without std because the workspace sets default-features=false).
+# Without `std` OR `disable_target_static_assertions`, impls.rs fires a
+# compile-time assert that usize==u32, which only holds on wasm32.
+# Adding the flag here is the minimal fix for a host binary.
+sp-runtime-interface = { workspace = true, features = ["disable_target_static_assertions"] }
+# attestor-primitives: workspace default is default-features=false; eth's
+# continuity module needs BlockError to implement Display/StdError (std feature).
+attestor-primitives = { workspace = true, features = ["std"] }
+usc-abi-encoding = { workspace = true }
