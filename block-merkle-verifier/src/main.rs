@@ -46,6 +46,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use eth::{Client, OrderedBlock};
 use utils::block_item_traits::BlockItem as _;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
@@ -74,8 +75,15 @@ struct Cli {
     /// Examples:
     ///   --heights 100,200,300
     ///   -H 100 -H 200 -H 300
-    #[arg(long, short = 'H', value_delimiter = ',', conflicts_with = "height")]
+    #[arg(long, short = 'H', value_delimiter = ',', conflicts_with_all = ["height", "input_csv"])]
     heights: Vec<u64>,
+
+    /// CSV file with `block_number,merkle_root` pairs (one per line,
+    /// optional header). Each row is verified against its expected root
+    /// using the same concurrency cap as batch mode. Cannot be combined
+    /// with --height or --heights.
+    #[arg(long, short = 'i', conflicts_with_all = ["height", "heights"])]
+    input_csv: Option<PathBuf>,
 
     /// Expected Merkle root (hex, with or without 0x prefix).
     /// Pass "skip" to skip the comparison and just print the computed root.
@@ -101,7 +109,7 @@ struct Cli {
     concurrency: usize,
 }
 
-// ─── Internal result type ────────────────────────────────────────────────────
+// ─── Internal types ──────────────────────────────────────────────────────────────
 
 struct BlockOutput {
     #[allow(dead_code)]
@@ -109,6 +117,13 @@ struct BlockOutput {
     block_hash_hex: String,  // pre-formatted "<hex>" without 0x prefix
     tx_count: usize,
     computed_root: B256,
+}
+
+/// One input row for batch mode: height + optional expected root.
+#[derive(Clone)]
+struct BatchJob {
+    height: u64,
+    expected: Option<B256>,
 }
 
 // ─── Main ────────────────────────────────────────────────────────────────────
@@ -120,15 +135,29 @@ async fn main() -> Result<()> {
     // Determine mode.
     enum Mode {
         Single(u64),
-        Batch(Vec<u64>),
+        Batch(Vec<BatchJob>),
     }
 
-    let mode = match (cli.height, cli.heights.is_empty()) {
-        (Some(h), _) => Mode::Single(h),
-        (None, false) => Mode::Batch(cli.heights),
-        (None, true) => {
+    let mode = match (cli.height, cli.heights.is_empty(), cli.input_csv.as_ref()) {
+        (Some(h), _, _) => Mode::Single(h),
+        (None, false, _) => Mode::Batch(
+            cli.heights
+                .iter()
+                .map(|&height| BatchJob { height, expected: None })
+                .collect(),
+        ),
+        (None, true, Some(path)) => {
+            let jobs = parse_csv_jobs(path)
+                .with_context(|| format!("reading {}", path.display()))?;
+            if jobs.is_empty() {
+                eprintln!("error: --input-csv contained no valid rows");
+                std::process::exit(2);
+            }
+            Mode::Batch(jobs)
+        }
+        (None, true, None) => {
             eprintln!(
-                "error: provide --height <N> (single-block) or --heights <N1,N2,...> (batch)"
+                "error: provide --height <N>, --heights <N1,N2,...>, or --input-csv <path>"
             );
             std::process::exit(2);
         }
@@ -143,6 +172,7 @@ async fn main() -> Result<()> {
                 .from_env_lossy(),
         )
         .with_target(false)
+        .with_writer(std::io::stderr) // never pollute stdout (CSV output)
         .init();
 
     let encoding = parse_encoding_version(&cli.encoding)?;
@@ -168,11 +198,11 @@ async fn main() -> Result<()> {
             };
             run_single(&client, height, encoding, expected, cli.verbose).await
         }
-        Mode::Batch(heights) => {
+        Mode::Batch(jobs) => {
             if cli.concurrency == 0 {
                 anyhow::bail!("--concurrency must be at least 1");
             }
-            run_batch(Arc::new(client), heights, encoding, cli.concurrency).await
+            run_batch(Arc::new(client), jobs, encoding, cli.concurrency).await
         }
     }
 }
@@ -226,17 +256,21 @@ async fn run_single(
 
 async fn run_batch(
     client: Arc<Client>,
-    heights: Vec<u64>,
+    jobs: Vec<BatchJob>,
     encoding: usc_abi_encoding::common::EncodingVersion,
     concurrency: usize,
 ) -> Result<()> {
-    let total = heights.len();
-    eprintln!("Batch: {} blocks  concurrency={}", total, concurrency);
+    let total = jobs.len();
+    let has_expected = jobs.iter().any(|j| j.expected.is_some());
+    eprintln!(
+        "Batch: {} blocks  concurrency={}  expected_roots={}",
+        total, concurrency, if has_expected { "yes" } else { "no" }
+    );
 
     let sem = Arc::new(Semaphore::new(concurrency));
-    let mut set: JoinSet<(u64, Result<BlockOutput>)> = JoinSet::new();
+    let mut set: JoinSet<(BatchJob, Result<BlockOutput>)> = JoinSet::new();
 
-    for height in heights {
+    for job in jobs {
         let client = client.clone();
         let sem = sem.clone();
         set.spawn(async move {
@@ -245,27 +279,43 @@ async fn run_batch(
                 .acquire_owned()
                 .await
                 .expect("semaphore never closes");
-            let res = compute_block_root(&client, height, encoding).await;
-            (height, res)
+            let res = compute_block_root(&client, job.height, encoding).await;
+            (job, res)
         });
     }
 
     // Collect results as they complete; log progress to stderr.
-    let mut results: Vec<(u64, Result<BlockOutput>)> = Vec::with_capacity(total);
+    let mut results: Vec<(BatchJob, Result<BlockOutput>)> = Vec::with_capacity(total);
     let mut done = 0usize;
+    let mut matches = 0usize;
+    let mut mismatches = 0usize;
 
     while let Some(join_res) = set.join_next().await {
         done += 1;
         match join_res {
-            Ok((height, res)) => {
+            Ok((job, res)) => {
                 match &res {
-                    Ok(out) => eprintln!(
-                        "  [{done}/{total}] ✓ {height}  root=0x{}…",
-                        &hex::encode(out.computed_root.as_slice())[..16]
-                    ),
-                    Err(e) => eprintln!("  [{done}/{total}] ✗ {height}  err={e:#}"),
+                    Ok(out) => {
+                        let status = match job.expected {
+                            Some(exp) if exp == out.computed_root => {
+                                matches += 1;
+                                "✓ MATCH"
+                            }
+                            Some(_) => {
+                                mismatches += 1;
+                                "✗ MISMATCH"
+                            }
+                            None => "✓ OK",
+                        };
+                        eprintln!(
+                            "  [{done}/{total}] {status} {}  root=0x{}…",
+                            job.height,
+                            &hex::encode(out.computed_root.as_slice())[..16]
+                        );
+                    }
+                    Err(e) => eprintln!("  [{done}/{total}] ✗ {}  err={e:#}", job.height),
                 }
-                results.push((height, res));
+                results.push((job, res));
             }
             Err(join_err) => {
                 eprintln!("  [{done}/{total}] task panicked: {join_err}");
@@ -273,36 +323,136 @@ async fn run_batch(
         }
     }
 
-    // Sort by height descending (newest first) for consistent output.
-    results.sort_by(|a, b| b.0.cmp(&a.0));
+    // Sort by height ascending (matches typical input ordering).
+    results.sort_by(|a, b| a.0.height.cmp(&b.0.height));
 
     // Emit CSV to stdout so it can be piped/redirected.
-    println!("Height,Block Hash,Txns,Computed Merkle Root,Status");
-    for (height, res) in &results {
-        match res {
-            Ok(out) => println!(
-                "{},0x{},{},0x{},OK",
-                height,
-                out.block_hash_hex,
-                out.tx_count,
-                hex::encode(out.computed_root.as_slice())
-            ),
-            Err(e) => println!(
-                "{},,,\"{}\",ERROR",
-                height,
-                e.to_string().replace('"', "'")
-            ),
+    if has_expected {
+        println!("block_number,expected_root,computed_root,block_hash,txns,status");
+        for (job, res) in &results {
+            let exp_hex = job
+                .expected
+                .map(|e| format!("0x{}", hex::encode(e.as_slice())))
+                .unwrap_or_default();
+            match res {
+                Ok(out) => {
+                    let computed_hex = format!("0x{}", hex::encode(out.computed_root.as_slice()));
+                    let status = match job.expected {
+                        Some(exp) if exp == out.computed_root => "MATCH",
+                        Some(_) => "MISMATCH",
+                        None => "OK",
+                    };
+                    println!(
+                        "{},{},{},0x{},{},{}",
+                        job.height, exp_hex, computed_hex, out.block_hash_hex, out.tx_count, status
+                    );
+                }
+                Err(e) => println!(
+                    "{},{},,,,\"ERROR: {}\"",
+                    job.height,
+                    exp_hex,
+                    e.to_string().replace('"', "'")
+                ),
+            }
+        }
+    } else {
+        println!("Height,Block Hash,Txns,Computed Merkle Root,Status");
+        for (job, res) in &results {
+            match res {
+                Ok(out) => println!(
+                    "{},0x{},{},0x{},OK",
+                    job.height,
+                    out.block_hash_hex,
+                    out.tx_count,
+                    hex::encode(out.computed_root.as_slice())
+                ),
+                Err(e) => println!(
+                    "{},,,\"{}\",ERROR",
+                    job.height,
+                    e.to_string().replace('"', "'")
+                ),
+            }
         }
     }
 
     let ok = results.iter().filter(|(_, r)| r.is_ok()).count();
-    eprintln!("\nBatch complete: {ok}/{total} OK");
-
-    if ok < total {
-        std::process::exit(1);
+    if has_expected {
+        let errors = total - ok;
+        eprintln!(
+            "\nBatch complete: total={total} match={matches} mismatch={mismatches} error={errors}"
+        );
+        if mismatches > 0 || errors > 0 {
+            std::process::exit(1);
+        }
+    } else {
+        eprintln!("\nBatch complete: {ok}/{total} OK");
+        if ok < total {
+            std::process::exit(1);
+        }
     }
 
     Ok(())
+}
+
+// ─── CSV input parsing ───────────────────────────────────────────────────
+
+/// Parse `block_number,merkle_root` rows. Header is auto-skipped when the
+/// first column doesn't parse as an integer. Trailing/extra columns are
+/// ignored. Roots may include or omit the `0x` prefix.
+fn parse_csv_jobs(path: &std::path::Path) -> Result<Vec<BatchJob>> {
+    let text = std::fs::read_to_string(path)?;
+    let mut jobs = Vec::new();
+    let mut skipped_header = false;
+    let mut bad_rows = 0usize;
+
+    for (lineno, raw) in text.lines().enumerate() {
+        let line = raw.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let mut parts = line.splitn(3, ',');
+        let h_str = parts.next().unwrap_or("").trim().trim_matches('"');
+        let r_str = parts.next().unwrap_or("").trim().trim_matches('"');
+
+        // Skip a header row whose first column isn't an integer.
+        let height: u64 = match h_str.parse() {
+            Ok(n) => n,
+            Err(_) => {
+                if !skipped_header && lineno == 0 {
+                    skipped_header = true;
+                    continue;
+                }
+                bad_rows += 1;
+                eprintln!("  skip: line {} non-numeric height '{}'", lineno + 1, h_str);
+                continue;
+            }
+        };
+
+        let expected = if r_str.is_empty() {
+            None
+        } else {
+            match parse_b256(r_str) {
+                Ok(b) => Some(b),
+                Err(e) => {
+                    bad_rows += 1;
+                    eprintln!(
+                        "  skip: line {} block {} bad root '{}': {}",
+                        lineno + 1,
+                        height,
+                        r_str,
+                        e
+                    );
+                    continue;
+                }
+            }
+        };
+        jobs.push(BatchJob { height, expected });
+    }
+
+    if bad_rows > 0 {
+        eprintln!("  ({} input rows skipped)", bad_rows);
+    }
+    Ok(jobs)
 }
 
 // ─── Core: fetch block + compute root ───────────────────────────────────────
